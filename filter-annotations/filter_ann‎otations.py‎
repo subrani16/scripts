@@ -1,0 +1,198 @@
+"""A script for filtering annotations by minimum area and height threshold
+
+Usage:
+    python filter_annotations.py -d <input_directory> -o <output_directory>
+"""
+
+import json
+from pathlib import Path
+
+# THRESHOLDS
+MIN_AREA_PX = 270
+MIN_HEIGHT = 0.06
+
+
+def filter_encord_annotations(encord_native_data):
+    """ Process and filter annotations in Encord native format (handles both images and videos).
+
+    Args:
+        encord_native_data: JSON file exported from Encord.
+        The structure can be a dictionary or a list contaning the dictionary.
+
+    Returns:
+        filtered_objects: List of dictionaries containing the objects that meet
+        both requirements.
+        passed_objects: Number of objects that meet both requirements.
+        removed_objects: Number of objects that do not meet both requirements.
+    """
+
+    filtered_objects = []
+    passed_objects = 0
+    removed_objects = 0
+
+    for unit in encord_native_data.get("data_units", {}).values():
+        image_width = unit.get("width")
+        image_height = unit.get("height")
+        labels = unit.get("labels", {})
+
+
+        def filter_list(object_list, frame_id):
+            """Review list of objects and applies the area and height filters.
+                This is an internal function to access the image_height and image_width
+                values and update the counters.
+
+            Args:
+                object_list: List of dictonaries ("objects") in Encord
+                frame_id: Id of each frame
+
+            Returns:
+                None: Update "passed_objects" and "removed_objects" in the main funtion
+                using "nonlocal"
+            """
+            # Access image_width and image_height from the main function and use "nonlocal"
+            nonlocal passed_objects, removed_objects
+            for object in object_list:
+                bbox = object.get("boundingBox", {})
+
+                # Get object's height (%)
+                object_relative_height = bbox.get("h", 0)
+                # Calculate the object's pixel area
+                area_px = (bbox.get("w", 0) * image_width) * (object_relative_height * image_height)
+
+                # Filter out objects that do not meet the minimum thresholds
+                if area_px < MIN_AREA_PX and object_relative_height < MIN_HEIGHT:
+                    filtered_objects.append({"labels": object})
+                    passed_objects += 1
+                else:
+                    removed_objects += 1
+        # Get frame ID:
+        if "objects" in labels:
+            # If images
+            filter_list(labels["objects"], 0)
+        else:
+            # Or videos
+            for frame_num, frame_data in labels.items():
+                if "objects" in frame_data:
+                    filter_list(frame_data["objects"], frame_num)
+
+    return filtered_objects, passed_objects, removed_objects
+
+
+def filter_coco_annotations(coco_data):
+    """Process and filter annotations in COCO format.
+
+    Args:
+        coco_data: A dictionary contaning the standard COCO structure
+        (images, annotations, categories)
+
+    Returns:
+        filtered_annotations: A list of dictionaries contaning the annotations
+        the meet both requirements
+        passed_annotations: Number of annotations that meet both requirements
+        removed_annotations: Number of annotations that do not meet both requirements
+    """
+
+    # Map heights from "images" to be used when calculating "total_image_height"
+    image_height = {}
+    for image in coco_data.get("images", []):
+        image_height[image["id"]] = image["height"]
+
+    annotations = coco_data.get("annotations", [])
+    filtered_annotations = []
+    passed_annotations = 0
+    removed_annotations = 0
+
+    for object in annotations:
+        # Get the object's pixel area from "area"
+        area = object.get("area", 0)
+        # Get the object's height (px) from "Bbox" [x, y, w, h]
+        object_height = object.get("bbox", [0, 0, 0, 0])[3]
+        # Get the total height of the image (px)
+        total_image_height = image_height.get(object.get("image_id"), 0)
+        # Calculate object's relative height (%)
+        object_relative_height = object_height / total_image_height if total_image_height > 0 else 0
+
+        # Filter out objects that do not meet the minimum thresholds
+        if area < MIN_AREA_PX and object_relative_height < MIN_HEIGHT:
+            filtered_annotations.append({"annotations": object})
+            passed_annotations += 1
+        else:
+            removed_annotations += 1
+
+    return filtered_annotations, passed_annotations, removed_annotations
+
+
+def save_filtered_annotations(input_directory_path, annotations, output_directory_path):
+    """Save filtered objects in a new JSON file.
+
+    Args:
+        input_directory_path: Path to the input directory
+        annotations: The list of filtered objects that will be saved in the new file
+        output_directory_path: Path to the output annotations
+
+    Returns:
+        output_anntations: Output annotations file.
+    """
+    # Get the file's base name to be used as directory name
+    file_name = Path(input_directory_path).stem
+    directory_name = file_name.split('.')[0]
+    directory_path = Path(output_directory_path) / directory_name
+
+    # Create new directory if already present
+    count = 1
+    output_directory = directory_path
+    while output_directory.exists():
+        output_directory = Path(f"{directory_path}_{count}")
+        count += 1
+
+    # Create new directory
+    output_directory.mkdir(parents=True, exist_ok=True)
+    output_annotations = output_directory / f"{file_name}.json"
+
+    # Save filtered annotations
+    with output_annotations.open("w", encoding="utf-8") as f:
+        json.dump(annotations, f, ensure_ascii=False, indent=4)
+
+    return output_annotations
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Filter Annotations by Minimum Area and Height Threshold")
+    parser.add_argument("input_directory",
+                        help="Path to the input directory containing the annotations")
+    parser.add_argument("new_directory",
+                        help="Path to the output directory to save the filtered objects")
+    parser.add_argument("-d", action="store_true",
+                        help="Path to input directory")
+    parser.add_argument("-o", action="store_true",
+                        help="Path to output directory")
+    args = parser.parse_args()
+
+    try:
+        with open(args.input_directory, "r", encoding="utf-8") as f:
+            file_json = json.load(f)
+        # Handle lists if used by Encord native data and extract first dictionary
+        if (isinstance(file_json, list) and "data_units" in file_json[0]) or "data_units" in file_json:
+            file_json = file_json[0]
+            print("ENCORD Format")
+            results, retained_objects, deleted_objects = filter_encord_annotations(file_json)
+        elif "annotations" in file_json:
+            print("COCO Format")
+            results, retained_objects, deleted_objects = filter_coco_annotations(file_json)
+        else:
+            raise ValueError("Invalid JSON format.")
+
+        output_annotations = save_filtered_annotations(args.input_directory, results, args.new_directory)
+
+        print("\n" + "=" * 40)
+        print(f"Summary Statistics:")
+        print(f"Total objects processed: {retained_objects + deleted_objects}")
+        print(f"Total objects retained: {retained_objects}")
+        print(f"Total objects removed: {deleted_objects}")
+        print("=" * 40)
+
+    except Exception as e:
+        print(f"Error: {e}")
