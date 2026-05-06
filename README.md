@@ -20,11 +20,22 @@ Custom scripts designed to parse complex data exports from labeling and telemetr
 *   **Value:** Transforms raw logs into actionable insights for operational decision-making.
 
 ## 🛠️ Tech Stack
+
+### Core
 *   **Language:** Python 3.x
-*   **Key Libraries:** 
+*   **Data Handling:** 
+    *   `pandas`: For advanced data structure manipulation and normalization.
+    *   `json` / `csv`: For parsing and saving annotation formats.
+    *   `sqlite3`: Built-in engine for high-performance data querying and filtering.
+
+### Utilities & Infrastructure
+*   **API & Communication:**
     *   `requests`: For API communication and HTTP protocols.
-    *   `json` / `csv`: For data structure manipulation.
-    *   `pytube`: For video asset management.
+    *   `SSE (Server-Sent Events)`: For handling real-time data streams.
+*   **Media Management:**
+    *   `pytube`: For video asset management and processing.
+*   **UX/UI:**
+    *   `tqdm`: For real-time progress bar visualization during processing.
 
 ## 📈 Impact on Implementation
 These tools were built with **modularity** and **efficiency** in mind. They have successfully reduced response times in L2 support environments and simplified the integration handshake between physical security hardware and software platforms.
