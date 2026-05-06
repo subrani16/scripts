@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """A script for filtering annotations by minimum area and height threshold
 
 Usage:
