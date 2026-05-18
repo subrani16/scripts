@@ -23,12 +23,23 @@ Custom scripts designed to parse complex data exports from labeling and telemetr
 
 ### Core
 *   **Language:** Python 3.x
-*   **Data Handling:** 
-    *   `pandas`: For advanced data structure manipulation and normalization.
-    *   `json` / `csv`: For parsing and saving annotation formats.
-    *   `sqlite3`: Built-in engine for high-performance data querying and filtering.
+  
+#### Data Handling & Storage
+* `pandas`: For advanced data structure manipulation, cleanup, and normalization.
+* `json` / `csv`: Standard libraries for parsing and saving structured dataset annotation formats.
+* `sqlite3`: Built-in relational engine for high-performance data querying, caching, and filtering.
 
-### Utilities & Infrastructure
+#### File System & Workflow Automation
+* `os`: For navigating directories, checking path existence, and handling operating system tasks.
+* `shutil`: For high-level file operations, such as copying, moving, and archiving dataset splits.
+
+#### Utilities & Machine Learning Preparation
+* `random`: For shuffling datasets, generating random seeds, and creating unbiased train/test splits.
+
+#### Cloud Integration
+* `boto3`: The AWS SDK for Python, used for pulling raw images from or pushing processed annotations to Amazon S3 buckets.
+
+#### Utilities & Infrastructure
 *   **API & Communication:**
     *   `requests`: For API communication and HTTP protocols.
     *   `SSE (Server-Sent Events)`: For handling real-time data streams.
